@@ -21,6 +21,9 @@ n_jobs=10 if args.device=="cpu" else 1
 set_session(device=args.device, n_jobs=n_jobs)
 
 def train_eval(dataset_name, epochs, attacks_list, attack_library, debug, device, load=False):
+    """
+    Train and attack the baseline with the chosen attack methods. 
+    """
 
     x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name=dataset_name,
                                                                                            debug=debug)
@@ -38,8 +41,13 @@ def train_eval(dataset_name, epochs, attacks_list, attack_library, debug, device
     baseline.evaluate(x=x_test, y=y_test)
 
     for attack_method in attacks_list:
-        x_test_adv = baseline.generate_adversaries(x=x_test, y=y_test, device=device,
-                                                   attack_method=attack_method, attack_library=attack_library)
+
+        if load:
+            x_test_adv = model.load_adversaries(attack_method=attack_method, attack_library=attack_library, 
+                                                debug=debug)
+        else:
+            x_test_adv = baseline.generate_adversaries(x=x_test, y=y_test, device=device,
+                                  attack_method=attack_method, attack_library=attack_library)
 
         baseline.save_adversaries(data=x_test_adv, attack_method=attack_method, attack_library=attack_library, debug=debug)
         # x_test_adv = baseline.load_adversaries(attack=attack, relative_path=DATA_PATH, seed=0)
@@ -48,6 +56,9 @@ def train_eval(dataset_name, epochs, attacks_list, attack_library, debug, device
         baseline.evaluate(x=x_test_adv, y=y_test)
 
 def adversarial_train_eval(dataset_name, epochs, attacks_list, attack_library, debug, device, load=False):
+    """
+    Perform adversarial training on the baseline and evaluate the robust baselines on each attack.
+    """
     x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name=dataset_name,
                                                                                            debug=debug)
 
@@ -86,24 +97,6 @@ def adversarial_train_eval(dataset_name, epochs, attacks_list, attack_library, d
         for idx, tmp_attack_method in enumerate(attacks_list):
             print(f"\n{attack_method} attack against {tmp_attack_method} robust baseline")
             robust_baselines[idx].evaluate(x=x_test_adv, y=y_test)
-
-# def robust_eval(dataset_name, test, seed, device, robust_models, attacks, library):
-#     x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name=dataset_name,
-#                                                                                            test=test)
-#     baseline = BaselineConvnet(input_shape=input_shape, num_classes=num_classes, data_format=data_format,
-#                                dataset_name=dataset_name, test=test, epochs=None, library=library)
-#     baseline.load_classifier(relative_path=TRAINED_MODELS)
-#     baseline.evaluate(x=x_test, y=y_test)
-#     for method in robust_models:
-#         print("\n===",method,"robust eval ===")
-#         robust_baseline = baseline.load_robust_classifier(relative_path=TRAINED_MODELS, attack=method, seed=seed)
-#         robust_baseline.evaluate(x=x_test, y=y_test)
-#         for attack in attacks:
-#             for seed in [0,1,2]:
-#                 print("\nseed =", seed)
-#                 x_test_adv = baseline.load_adversaries(attack=attack, relative_path=DATA_PATH, seed=seed)
-#                 robust_baseline.evaluate(x=x_test_adv, y=y_test)
-
 
 train_eval(dataset_name=args.dataset_name, epochs=args.epochs, attacks_list=attacks_list, attack_library=args.attack_library, 
            debug=args.debug, device=args.device, load=args.load)

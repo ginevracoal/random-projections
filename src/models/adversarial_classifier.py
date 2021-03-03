@@ -109,18 +109,11 @@ class AdversarialClassifier(sklKerasClassifier):
             self.model.compile(loss=keras.losses.categorical_crossentropy, optimizer=optimizer, metrics=['accuracy'])
 
             callbacks = []
-            tensorboard = keras.callbacks.TensorBoard(log_dir=LOG_DIR, histogram_freq=0, write_graph=True,
-                                                      write_images=True)
             es = keras.callbacks.EarlyStopping(monitor='loss', verbose=1)
             callbacks.append(es)
-
-            # if self.epochs == None:
-            #     # epochs = 50
-            #     epochs = 20
-            # else:
-            #     epochs = self.epochs
-            # if self.test == False:
-            callbacks.append(tensorboard)
+            # tensorboard = keras.callbacks.TensorBoard(log_dir=LOG_DIR, histogram_freq=0, write_graph=True,
+            #                                           write_images=True)
+            # callbacks.append(tensorboard)
 
             start_time = time.time()
             self.model.fit(x_train, y_train, epochs=self.epochs, batch_size=batch_size, callbacks=callbacks,
@@ -279,7 +272,6 @@ class AdversarialClassifier(sklKerasClassifier):
         """
         Saves the trained model and adds the current datetime to the filepath.
         """
-        # filepath+="/"
         os.makedirs(filepath, exist_ok=True)
         fullpath = filepath + filename + ".h5"
         print("\nSaving classifier: ", fullpath)
@@ -289,9 +281,11 @@ class AdversarialClassifier(sklKerasClassifier):
         """
         Loads a pre-trained classifier.
         """
-        # filepath+="/"
         print("\nLoading model: ", filepath + filename + ".h5")
         self.model = load_model(filepath + filename + ".h5")
         self.trained = True
+
+        optimizer = self.set_optimizer()
+        self.model.compile(loss=keras.losses.categorical_crossentropy, optimizer=optimizer, metrics=['accuracy'])
         return self
 
