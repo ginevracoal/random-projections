@@ -15,7 +15,7 @@ args = parser.parse_args()
 if args.attack_method:
     attacks_list = [args.attack_method]
 else:
-    attacks_list = ["fgsm", "pgd"]#, "deepfool", "carlini", "newtonfool", "virtual"]
+    attacks_list = ["fgsm", "pgd", "deepfool", "carlini"]#, "newtonfool", "virtual"]
 
 n_jobs=10 if args.device=="cpu" else 1
 set_session(device=args.device, n_jobs=n_jobs)
@@ -64,12 +64,18 @@ def adversarial_train_eval(dataset_name, epochs, attacks_list, attack_library, d
     for attack_method in attacks_list:
         print("\n", attack_method, "robust baseline")
 
-        robust_baseline = baseline.adversarial_train(x_train=x_train, y_train=y_train, device=device, 
-                                                    attack_method=attack_method, attack_library=attack_library)
-        robust_baseline.save_classifier(debug)
+        if load:
+            robust_classifier = baseline.load_robust_classifier(debug=debug, 
+                                attack_method=attack_method, attack_library=attack_library)
 
-        robust_baseline.evaluate(x=x_test, y=y_test)
-        robust_baselines.append(robust_baseline)
+        else:
+            robust_classifier = baseline.adversarial_train(x_train=x_train, y_train=y_train, device=device, 
+                                                           attack_method=attack_method, attack_library=attack_library)
+            baseline.save_robust_classifier(robust_classifier=robust_classifier,debug=debug, 
+                                            attack_method=attack_method, attack_library=attack_library)
+
+        robust_classifier.evaluate(x=x_test, y=y_test)
+        robust_baselines.append(robust_classifier)
 
     print("\n === Adversarial evaluations === ")
 

@@ -27,14 +27,13 @@ def set_session(device, n_jobs):
         # config.allow_soft_placement = True
         # config.log_device_placement = True  # to log device placement (on which device the operation ran)
         config.gpu_options.per_process_gpu_memory_fraction = 1/n_jobs
-        sess = tf.compat.v1.Session(config=config)
+        sess = tf.Session(config=config)
 
     keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
-    sess.run(tf.global_variables_initializer())
+    # sess.run(tf.compat.v1.global_variables_initializer())
     # print("check cuda: ", tf.test.is_built_with_cuda())
     # print("check gpu: ", tf.test.is_gpu_available())
     return sess
-
 
 def execution_time(start, end):
     hours, rem = divmod(end - start, 3600)

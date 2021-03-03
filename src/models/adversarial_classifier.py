@@ -15,6 +15,7 @@ from keras.layers import Input
 from keras.models import load_model
 from keras.wrappers.scikit_learn import KerasClassifier as sklKerasClassifier
 
+from utils.exec_settings import get_available_gpus
 from utils import directories
 from utils.data import save_to_pickle, load_from_pickle
 from utils.directories import *
@@ -265,20 +266,20 @@ class AdversarialClassifier(sklKerasClassifier):
         filename, filepath = directories._get_attack_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
                                                  epochs=self.epochs, debug=debug, 
                                                  attack_method=attack_method, attack_library=attack_library)
-        save_to_pickle(data=data, filepath=filepath+"/", filename=filename)
+        save_to_pickle(data=data, filepath=filepath, filename=filename)
 
     def load_adversaries(self, attack_method, attack_library, debug):
 
         filename, filepath = directories._get_attack_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
                                                  epochs=self.epochs, debug=debug, 
                                                  attack_method=attack_method, attack_library=attack_library)
-        return load_from_pickle(fullpath=filepath+"/"+filename)
+        return load_from_pickle(fullpath=filepath+filename)
 
     def save_classifier(self, filepath, filename):
         """
         Saves the trained model and adds the current datetime to the filepath.
         """
-        filepath+="/"
+        # filepath+="/"
         os.makedirs(filepath, exist_ok=True)
         fullpath = filepath + filename + ".h5"
         print("\nSaving classifier: ", fullpath)
@@ -288,7 +289,7 @@ class AdversarialClassifier(sklKerasClassifier):
         """
         Loads a pre-trained classifier.
         """
-        filepath+="/"
+        # filepath+="/"
         print("\nLoading model: ", filepath + filename + ".h5")
         self.model = load_model(filepath + filename + ".h5")
         self.trained = True
