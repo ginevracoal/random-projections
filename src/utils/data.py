@@ -14,7 +14,7 @@ from keras.datasets import mnist, fashion_mnist
 
 from utils.directories import *
 
-TEST_SIZE = 20
+TEST_SIZE = 100
 
 def load_fashion_mnist(img_rows=28, img_cols=28, n_samples=None):
     print("\nLoading fashion mnist.")
@@ -52,10 +52,10 @@ def load_fashion_mnist(img_rows=28, img_cols=28, n_samples=None):
     print('x_train shape:', x_train.shape, '\nx_test shape:', x_test.shape)
     return x_train, y_train, x_test, y_test, input_shape, num_classes, data_format
 
-def preprocess_mnist(test, img_rows=28, img_cols=28, n_samples=None):
+def preprocess_mnist(debug, img_rows=28, img_cols=28, n_samples=None):
     """Preprocess mnist dataset for keras training
 
-    :param test: If test is True, only load the first 100 images
+    :param debug: If True, only load the first 100 images
     :param img_rows: input image n. rows
     :param img_cols: input image n. cols
     """
@@ -88,7 +88,7 @@ def preprocess_mnist(test, img_rows=28, img_cols=28, n_samples=None):
         x_test = x_test[:n_samples]
         y_test = y_test[:n_samples]
     else:
-        if test:
+        if debug:
             x_train = x_train[:TEST_SIZE]
             y_train = y_train[:TEST_SIZE]
             x_test = x_test[:TEST_SIZE]
@@ -123,7 +123,7 @@ def onehot_to_labels(y):
     # elif type(y) is torch.Tensor:
     #     return torch.max(y, 1)[1]
 
-def load_cifar(test, data, n_samples=None):
+def load_cifar(debug, data, n_samples=None):
     """Return train_data, train_labels, test_data, test_labels
     The shape of data is 32 x 32 x3"""
     x_train = None
@@ -166,7 +166,7 @@ def load_cifar(test, data, n_samples=None):
         x_test = x_test[:n_samples]
         y_test = y_test[:n_samples]
     else:
-        if test:
+        if debug:
             x_train = x_train[:TEST_SIZE]
             y_train = y_train[:TEST_SIZE]
             x_test = x_test[:TEST_SIZE]
@@ -175,31 +175,32 @@ def load_cifar(test, data, n_samples=None):
     return x_train, _onehot(y_train), x_test, _onehot(y_test), input_shape, num_classes, data_format
 
 
-def load_dataset(dataset_name, test, data=DATA_PATH, n_samples=None):
+def load_dataset(dataset_name, debug, data=DATA_PATH, n_samples=None):
     """
     Load dataset.
     :param dataset_name: choose between "mnist" and "cifar"
-    :param test: If True only loads the first 100 samples
+    :param debug: If True only loads the first 100 samples
     """
     # global x_train, y_train, x_test, y_test, input_shape, num_classes, data_format
 
     if dataset_name == "mnist":
-        return preprocess_mnist(test=test, n_samples=n_samples)
+        return preprocess_mnist(debug=debug, n_samples=n_samples)
     elif dataset_name == "cifar":
-        return load_cifar(test=test, data=data, n_samples=n_samples)
-    elif dataset_name == "fashion_mnist":
+        return load_cifar(debug=debug, data=data, n_samples=n_samples)
+    elif dataset_name == "debug":
         return load_fashion_mnist(n_samples=n_samples)
     else:
         raise ValueError("\nWrong dataset name.")
 
 
-def save_to_pickle(data, relative_path, filename):
+def save_to_pickle(data, filepath, filename):
     """ saves data to pickle """
 
-    filepath = relative_path + filename
-    print("\nSaving pickle: ", filepath)
+    fullpath = filepath+filename+".pkl"
     os.makedirs(filepath, exist_ok=True)
-    with open(filepath, 'wb') as f:
+
+    print("\nSaving pickle: ", fullpath)
+    with open(fullpath, 'wb') as f:
         pkl.dump(data, f)
 
 
@@ -210,13 +211,13 @@ def unpickle(file):
     return data
 
 
-def load_from_pickle(path, test=False):
+def load_from_pickle(fullpath, debug=False):
     """ loads data from pickle containing: x_test, y_test."""
-    print("\nLoading from pickle: ",path)
-    with open(path, 'rb') as f:
+    print("\nLoading from pickle: ",fullpath+".pkl")
+    with open(fullpath+".pkl", 'rb') as f:
         u = pkl._Unpickler(f)
         u.encoding = 'latin1'
         data = u.load()
-    if test is True:
+    if debug:
         data = data[:TEST_SIZE]
     return data

@@ -11,9 +11,6 @@ from models.baseline_convnet import *
 from utils.projection_functions import *
 # from utils.robustness_measures import softmax_difference
 
-############
-# defaults #
-############
 
 REPORT_PROJECTIONS = False
 
@@ -24,7 +21,7 @@ class RandomEnsemble(BaselineConvnet):
     probabilities from the single projections.
     """
     def __init__(self, input_shape, num_classes, n_proj, size_proj, projection_mode, data_format, dataset_name, 
-                 attack_library, epochs=None, centroid_translation=False):
+                 epochs=None, centroid_translation=False):
         """
         Extends BaselineConvnet initializer with additional informations about the projections.
 
@@ -41,9 +38,6 @@ class RandomEnsemble(BaselineConvnet):
         if size_proj > input_shape[1]:
             raise ValueError("The size of projections has to be lower than the image size.")
 
-        super(RandomEnsemble, self).__init__(input_shape, num_classes, data_format, dataset_name, epochs)
-
-        self.model_name="randens"
         self.centroid_translation = centroid_translation # todo: refactor centroid translation
         self.translation_vector = None
         self.original_input_shape = input_shape
@@ -51,12 +45,17 @@ class RandomEnsemble(BaselineConvnet):
         self.size_proj = size_proj
         self.projection_mode = projection_mode
         self.random_seeds = range(0,n_proj)
-        self.input_shape = (size_proj, size_proj, input_shape[2])
         self.classifiers = None
         self.training_time = 0
         self.ensemble_method = "sum"  # supported methods: mode, sum
         self.x_test_proj = None
         self.baseline_classifier = None
+
+        super(RandomEnsemble, self).__init__(input_shape, num_classes, data_format, dataset_name, epochs)
+
+        # overwrite objects
+        self.model_name="randens"
+        self.input_shape = (size_proj, size_proj, input_shape[2])
 
         print("\n === RandEns model ( n_proj = ", self.n_proj, ", size_proj = ", self.size_proj, ") ===")
 
@@ -101,13 +100,13 @@ class RandomEnsemble(BaselineConvnet):
 
             # eventually adjust input dimension to a single channel projection
             if x_train_projected.shape[4] == 1:
-                self.input_shape = (self.input_shape[0],self.input_shape[1],1)
+                self.input_shape = (self.input_shape[0], self.input_shape[1],1)
 
             classifiers = []
             for i in self.random_seeds:
                 # use the same model architecture (not weights) for all trainings
-                baseline = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes,
-                                           data_format=self.data_format, dataset_name=self.dataset_name, test=self.test)
+                baseline = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes, epochs=self.epochs,
+                                           data_format=self.data_format, dataset_name=self.dataset_name)
                 # train n_proj classifiers on different training data
                 classifiers.append(baseline.train(x_train_projected[i], y_train, device))
                 del baseline
@@ -217,7 +216,7 @@ class RandomEnsemble(BaselineConvnet):
         if add_baseline_prob:
             print("\nAdding baseline probability vector to the predictions.")
             baseline = BaselineConvnet(input_shape=self.original_input_shape, num_classes=self.num_classes,
-                                       data_format=self.data_format, dataset_name=self.dataset_name, test=self.test)
+                                       data_format=self.data_format, dataset_name=self.dataset_name)
             baseline.load_classifier(relative_path=TRAINED_MODELS, folder="baseline/", filename=baseline.filename)
             baseline_predictions = baseline.predict(x)
 
@@ -252,7 +251,7 @@ class RandomEnsemble(BaselineConvnet):
         """ Adversaries are generated on the baseline classifier """
 
         baseline = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes,
-                                   data_format=self.data_format, dataset_name=self.dataset_name, test=self.test)
+                                   data_format=self.data_format, dataset_name=self.dataset_name)
         baseline.load_classifier(relative_path=TRAINED_MODELS + MODEL_NAME + "/")
         x_adv = baseline.generate_adversaries(x, y, attack=attack, eps=eps)
         return x_adv
@@ -277,51 +276,49 @@ class RandomEnsemble(BaselineConvnet):
     #         filename = filename + "_epochs=" + str(self.epochs) + "_" + str(seed)
     #     return filename
 
-    def save_classifier(self, filename=None, filepath=None):
+    def save_classifier(self, debug, filename=None, filepath=None):
         """
-        Saves all projections classifiers separately.
-        :param relative_path: relative path of the folder containing the list of trained classifiers.
-                              It can be either TRAINED_MODELS or RESULTS
-        :param filename: filename
+        Saves projections classifiers.
         """
 
-        filename, filepath = directories._get_model_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
-                        size_proj=self.size_proj, projection_mode=self.projection_mode, epochs=self.epochs, seed=None, 
-                        centroid_translation=False)
+        if filename is None or filepath is None:
+            filename, filepath = directories._get_model_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
+                            size_proj=self.size_proj, projection_mode=self.projection_mode, epochs=self.epochs,
+                            centroid_translation=self.centroid_translation, debug=debug)
 
         if self.trained:
             for seed, proj_classifier in enumerate(self.classifiers):
 
-                filename += "_"+str(seed)
-                proj_classifier.save_classifier(relative_path=relative_path, folder=self.folder,
-                                                filename=filename)
+                proj_classifier.save_classifier(filepath=filepath, filename=filename+"_"+str(seed), debug=debug)
+
             if self.centroid_translation:
-                save_to_pickle(data=self.translation_vector,
-                               relative_path="../results/" + str(time.strftime('%Y-%m-%d')) + "/" + self.folder,
-                               filename="training_data_centroid.pkl")
+                save_to_pickle(data=self.translation_vector, 
+                               filepath=filepath, filename="training_data_centroid.pkl")
         else:
             raise ValueError("Train the model first.")
 
-    def load_classifier(self, relative_path, folder=None, filename=None):
+    def load_classifier(self, debug, filename=None, filepath=None):
         """
-        Loads a pre-trained classifier and sets the projector with the training seed.
-        :param relative_path: relative path of the folder containing the list of trained classifiers.
-                              It can be either TRAINED_MODELS or RESULTS
-        :param filename: filename
-        :return: list of trained classifiers
+        Loads a pre-trained classifier.
         """
+
+        if filename is None or filepath is None:
+            filename, filepath = directories._get_model_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
+                            size_proj=self.size_proj, projection_mode=self.projection_mode, epochs=self.epochs,
+                            centroid_translation=self.centroid_translation, debug=debug)
+
         start_time = time.time()
         self.trained = True
 
         classifiers = []
         for i in self.random_seeds:
-            proj_classifier = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes, test=self.test,
+            proj_classifier = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes,
                                               data_format=self.data_format, dataset_name=self.dataset_name)
-            classifiers.append(proj_classifier.load_classifier(relative_path=relative_path, folder=self.folder,
-                                                               filename=self._set_baseline_filename(seed=i)))
+            classifiers.append(proj_classifier.load_classifier(filepath=filepath, filename=filename+"_"+str(seed), 
+                               debug=debug))
+        
         if self.centroid_translation:
-            self.translation_vector = load_from_pickle(path=relative_path + self.folder + "training_data_centroid.pkl",
-                                                       test=False)
+            self.translation_vector = load_from_pickle(path=filepath+"training_data_centroid.pkl")
         else:
             self.translation_vector = None
 

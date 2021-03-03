@@ -1,32 +1,43 @@
 DATA_PATH = "../../adversarial_examples/data/"
 EXPERIMENTS = "../experiments/"
+LOG_DIR = EXPERIMENTS+"tensorboard/"
 
-def _get_model_savedir(model_name, dataset_name, epochs, size_proj=None, projection_mode=None, centroid_translation=False):
+def _get_model_savedir(model_name, dataset_name, epochs, debug, 
+                       size_proj=None, projection_mode=None, centroid_translation=False,
+                       robust=False, attack_method=None, attack_library=None):
 
-    filepath = dataset_name+"_ep="+str(epochs)
+    filepath = model_name+"_"+dataset_name+"_ep="+str(epochs)
 
     if size_proj:
-        filepath += "_sizeproj="+str(size_proj)+"_"+str(projection_mode)
+        filepath += "_size="+str(size_proj)+"_"+projection_mode
 
     if centroid_translation:
         filepath += "_centroid"
 
-    filename = model_name+"_"+filepath+"_weights"
+    if robust:
+        filepath += attack_library+"_"+attack_method+"_robust"
 
-    return filename, EXPERIMENTS+filepath
+    filename = filepath+"_weights"
+    filepath = EXPERIMENTS+"debug/"+filepath if debug else EXPERIMENTS+filepath
 
-    # def _set_baseline_filename(self, seed):
-    #     """ Sets baseline filenames inside randens folder based on the projection seed. """
-    #     filename = self.dataset_name + "_baseline" + "_size=" + str(self.size_proj) + \
-    #                "_" + str(self.projection_mode)
-
-    #     if self.epochs == None:
-    #         filename = filename + "_" + str(seed)
-    #     else:
-    #         filename = filename + "_epochs=" + str(self.epochs) + "_" + str(seed)
-    #     return filename
+    return filename, filepath
 
 
-# def _get_attack_savedir():
+def _get_attack_savedir(model_name, dataset_name, epochs, debug, attack_method, attack_library,
+                        size_proj=None, projection_mode=None, centroid_translation=False, robust=False):
 
-#     return filename, filepath
+    filepath = model_name+"_"+dataset_name+"_ep="+str(epochs)
+
+    if size_proj:
+        filepath += "_size="+str(size_proj)+"_"+projection_mode
+
+    if centroid_translation:
+        filepath += "_centroid"
+
+    if robust:
+        filepath += attack_library+"_"+attack_method+"_robust"
+
+    filename = attack_library+"_"+attack_method+"_attack"
+    filepath = EXPERIMENTS+"debug/"+filepath if debug else EXPERIMENTS+filepath
+
+    return filename, filepath

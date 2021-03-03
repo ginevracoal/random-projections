@@ -1,6 +1,7 @@
 import argparse
 from utils.exec_settings import *
 from models.random_ensemble import RandomEnsemble
+from models.baseline_convnet import BaselineConvnet
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset_name", default="mnist", type=str, help=str(DATASETS))
@@ -9,35 +10,40 @@ parser.add_argument("--attack_method", default="fgsm", type=str, help=str(ATTACK
 parser.add_argument("--epochs", default=20, type=int, help="Training epochs.")
 parser.add_argument("--load", default=False, type=eval, help="Load saved computations and evaluate them.")
 parser.add_argument("--debug", default=False, type=eval, help="Run script in debugging mode.")
-parser.add_argument("--device", default='cuda', type=str, help="cpu, cuda")  
-parser.add_argument("--attack_library", default='cleverhans', type=str)  
+parser.add_argument("--device", default='cpu', type=str, help="cpu")  # todo: gpu
+parser.add_argument("--attack_library", default='art', type=str, help="art, cleverhans")  
 args = parser.parse_args()
 
 n_proj_list = [6, 9, 12, 15]
 size_proj_list = [8, 12, 16, 20]
 
-set_session(device=args.device, n_jobs=6)
+if args.attack_method:
+    attacks_list = [args.attack_method]
+else:
+    attacks_list = ["fgsm", "pgd", "deepfool", "carlini", "newtonfool", "virtual"]
 
-def attack_randens(dataset_name, n_proj, size_proj, projection_mode, attack_method, device, debug):
+n_jobs=10 if args.device=="cpu" else 1
+set_session(device=args.device, n_jobs=n_jobs)
+
+def attack_randens(dataset_name, n_proj, size_proj, projection_mode, attacks_list, device, debug):
 
     x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name, debug)
 
     model = RandomEnsemble(input_shape=input_shape, num_classes=num_classes,
                            n_proj=n_proj, size_proj=size_proj, projection_mode=projection_mode,
                            data_format=data_format, dataset_name=dataset_name, epochs=args.epochs,
-                           centroid_translation=False, attack_library=args.attack_library)
+                           centroid_translation=False)
 
     if args.load:
-        model.load_classifier()
+        model.load_classifier(args.debug)
 
     else:
         model.train(x_train, y_train, device=args.device)
-        if args.debug is False:
-            model.save_classifier()
+        model.save_classifier(args.debug)
 
     baseline = BaselineConvnet(input_shape=input_shape, num_classes=num_classes, data_format=data_format,
-                               dataset_name=dataset_name, epochs=args.epochs, attack_library=args.attack_library)
-    baseline.load_classifier()
+                               dataset_name=dataset_name, epochs=args.epochs)
+    baseline.load_classifier(args.debug)
 
     model.evaluate(x=x_test, y=y_test)
 
@@ -49,8 +55,7 @@ def attack_randens(dataset_name, n_proj, size_proj, projection_mode, attack_meth
             x_test_adv = model.load_adversaries(relative_path=RESULTS, attack=attack)
         else:
             x_test_adv = baseline.generate_adversaries(x=x_test, y=y_test, attack=attack, seed=seed)
-            if args.debug is False:
-                baseline.save_adversaries(data=x_test_adv, attack=attack, seed=seed)
+            baseline.save_adversaries(data=x_test_adv, attack=attack, seed=seed)
 
         model.evaluate(x=x_test_adv, y=y_test)
         softmax_difference(classifier=model, x1=x_test, x2=x_test_adv)
@@ -97,6 +102,6 @@ for n_proj in n_proj_list:
     for size_proj in size_proj_list:
         K.clear_session()
         attack_randens(dataset_name=args.dataset_name, n_proj=n_proj, size_proj=size_proj,
-                       projection_mode=args.projection_mode, attack_method=args.attack_method, 
+                       projection_mode=args.projection_mode, attacks_list=attacks_list, 
                        device=args.device, debug=args.debug)
 

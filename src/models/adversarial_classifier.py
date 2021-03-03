@@ -1,38 +1,47 @@
 # -*- coding: utf-8 -*-
 
-# from utils.exec_settings import *
-
-from keras.models import Model
-from keras.wrappers.scikit_learn import KerasClassifier as sklKerasClassifier
-from sklearn.metrics import classification_report
-from utils import *
+import os
 import time
-import tensorflow as tf
-from keras.layers import Input
-from tensorflow.python.client import device_lib
-from keras.models import load_model
 import random
 import warnings
+import numpy as np
+from sklearn.metrics import classification_report
+
+import tensorflow as tf
+from tensorflow.python.client import device_lib
+import keras
+from keras.models import Model
+from keras.layers import Input
+from keras.models import load_model
+from keras.wrappers.scikit_learn import KerasClassifier as sklKerasClassifier
+
+from utils import directories
+from utils.data import save_to_pickle, load_from_pickle
+from utils.directories import *
+from utils.projection_functions import compute_distances
+
 
 class AdversarialClassifier(sklKerasClassifier):
     """
     Adversarial Classifier base class
     """
 
-    def __init__(self, input_shape, num_classes, data_format, dataset_name, epochs, attack_library):
+    def __init__(self, input_shape, num_classes, data_format, dataset_name, epochs):
 
-        self.model = self._set_model()
-        super(AdversarialClassifier, self).__init__(build_fn=self.model, epochs=epochs)
 
         self.input_shape = input_shape
         self.num_classes = num_classes
         self.data_format = data_format
         self.dataset_name = dataset_name
-        self.test = test
-        self.classes_ = self._set_classes()
-        self.folder, self.filename = self._set_model_path().values()
-        self.attack_library = attack_library  # art, cleverhans
+        self.epochs = epochs
+        # self.folder, self.filename = self._set_model_path().values()
+        # self.attack_library = attack_library  # art, cleverhans
         self.trained = False
+        
+        self.classes_ = self._set_classes()
+        self.model = self._set_model()
+
+        super(AdversarialClassifier, self).__init__(build_fn=self.model, epochs=epochs)
 
     def _set_model_path(self, *args, **kwargs):
         raise NotImplementedError
@@ -80,7 +89,7 @@ class AdversarialClassifier(sklKerasClassifier):
 
     def _set_device_name(self, device):
         if device == "gpu":
-            return "/device:GPU:0"
+            return get_available_gpus()[0]
         elif device == "cpu":
             return "/CPU:0"
         else:
@@ -99,7 +108,7 @@ class AdversarialClassifier(sklKerasClassifier):
             self.model.compile(loss=keras.losses.categorical_crossentropy, optimizer=optimizer, metrics=['accuracy'])
 
             callbacks = []
-            tensorboard = keras.callbacks.TensorBoard(log_dir='../tensorboard/', histogram_freq=0, write_graph=True,
+            tensorboard = keras.callbacks.TensorBoard(log_dir=LOG_DIR, histogram_freq=0, write_graph=True,
                                                       write_images=True)
             es = keras.callbacks.EarlyStopping(monitor='loss', verbose=1)
             callbacks.append(es)
@@ -109,13 +118,12 @@ class AdversarialClassifier(sklKerasClassifier):
             #     epochs = 20
             # else:
             #     epochs = self.epochs
-            if self.test == False:
-                callbacks.append(tensorboard)
+            # if self.test == False:
+            callbacks.append(tensorboard)
 
-            # training
             start_time = time.time()
-            self.model.fit(x_train, y_train, epochs=self.epochs, batch_size=self.batch_size, callbacks=callbacks,
-                          shuffle=True, validation_split=0.2)
+            self.model.fit(x_train, y_train, epochs=self.epochs, batch_size=batch_size, callbacks=callbacks,
+                           shuffle=True, validation_split=0.2)
             print("\nTraining time: --- %s seconds ---" % (time.time() - start_time))
             self.trained = True
 
@@ -153,16 +161,11 @@ class AdversarialClassifier(sklKerasClassifier):
         """ Returns the norm used for computing perturbations on the given method. """
         return np.inf
 
-    def generate_adversaries(self, x, y, attack, eps=0.3, seed=0, device="cpu"):
+    def generate_adversaries(self, x, y, attack_method, attack_library, device, eps=0.3):
         """
         Generates adversaries on the input data x using a given attack method.
-
-        :param classifier: trained classifier
-        :param x: input data
-        :param attack: art.attack method
-        :return: adversarially perturbed data
         """
-        random.seed(seed)
+        random.seed(0)
         def batch_generate(attacker, x, batches=10):
             x_batches = np.split(x, batches)
             x_adv = []
@@ -174,77 +177,77 @@ class AdversarialClassifier(sklKerasClassifier):
         x_adv = None
 
         if self.trained:
-            print("\nGenerating adversaries with", attack, "method on", self.dataset_name)
+            print("\nGenerating adversaries with", attack_method, "method on", self.dataset_name)
             with warnings.catch_warnings():
-                if self.library == "art":
+                if attack_library == "art":
                     import art.attacks
                     from art.classifiers import KerasClassifier as artKerasClassifier
                     from art.utils import master_seed
 
                     classifier = artKerasClassifier(clip_values=(0,255), model=self.model)
-                    master_seed(seed)
+                    # master_seed(0)
 
                     # classifier._loss = self.loss_wrapper(tf.convert_to_tensor(x), None)
                     # classifier.custom_loss = self.loss_wrapper(tf.convert_to_tensor(x), None)
-                    if attack == 'fgsm':
+                    if attack_method == 'fgsm':
                         attacker = art.attacks.FastGradientMethod(classifier, eps=0.3)
                         x_adv = attacker.generate(x=x)
-                    elif attack == 'deepfool':
+                    elif attack_method == 'deepfool':
                         attacker = art.attacks.DeepFool(classifier, nb_grads=5)
                         x_adv = attacker.generate(x)
-                    elif attack == 'virtual':
+                    elif attack_method == 'virtual':
                         attacker = art.attacks.VirtualAdversarialMethod(classifier)
                         x_adv = attacker.generate(x)
-                    elif attack == 'carlini':
+                    elif attack_method == 'carlini':
                         attacker = art.attacks.CarliniLInfMethod(classifier, targeted=False, eps=0.5)
                         x_adv = attacker.generate(x=x)
-                    elif attack == 'pgd':
+                    elif attack_method == 'pgd':
                         attacker = art.attacks.ProjectedGradientDescent(classifier, eps=eps)
                         x_adv = attacker.generate(x=x)
-                    elif attack == 'newtonfool':
+                    elif attack_method == 'newtonfool':
                         attacker = art.attacks.NewtonFool(classifier, eta=0.3)
                         x_adv = attacker.generate(x=x)
-                    elif attack == 'boundary':
+                    elif attack_method == 'boundary':
                         attacker = art.attacks.BoundaryAttack(classifier, targeted=False, max_iter=500, delta=0.05)
                         # y = np.random.permutation(y)
                         x_adv = attacker.generate(x=x)
-                    elif attack == 'spatial':
+                    elif attack_method == 'spatial':
                         attacker = art.attacks.SpatialTransformation(classifier, max_translation=3.0, num_translations=5,
                                                          max_rotation=8.0,
                                                          num_rotations=3)
                         x_adv = attacker.generate(x=x)
-                    elif attack == 'zoo':
+                    elif attack_method == 'zoo':
                         attacker = art.attacks.ZooAttack(classifier)
                         x_adv = attacker.generate(x=x, y=y)
                     else:
                         raise("wrong attack name.")
 
-                elif self.library == "cleverhans":
+                elif attack_library == "cleverhans":
                     import cleverhans.attacks
                     from cleverhans.utils_keras import KerasModelWrapper
 
                     session = self._set_session(device=device)
                     classifier = KerasModelWrapper(self.model)
 
-                    if attack == 'fgsm':
+                    if attack_method == 'fgsm':
                         attacker = cleverhans.attacks.FastGradientMethod(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
                     elif attack == 'deepfool':
-                        attacker = cleverhans.attacks.DeepFool(classifier, sess=session)
+                        attack_method = cleverhans.attacks.DeepFool(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
-                    elif attack == 'carlini':
+                    elif attack_method == 'carlini':
                         attacker = cleverhans.attacks.CarliniWagnerL2(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
-                    elif attack == 'pgd':
+                    elif attack_method == 'pgd':
                         attacker = cleverhans.attacks.ProjectedGradientDescent(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
-                    elif attack == 'spatial':
+                    elif attack_method == 'spatial':
                         attacker = cleverhans.attacks.SpatialTransformationMethod(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
-                    elif attack == 'virtual':
+                    elif attack_method == 'virtual':
                         attacker = cleverhans.attacks.VirtualAdversarialMethod(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
-                    elif attack == 'saliency':
+                    elif attack_method == 'saliency':
                         attacker = cleverhans.attacks.SaliencyMapMethod(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
                 else:
@@ -252,60 +255,40 @@ class AdversarialClassifier(sklKerasClassifier):
         else:
             raise AttributeError("Train your classifier first.")
 
-        print("Distance from perturbations: ", compute_distances(x, x_adv, ord=self._get_norm(attack)))
+        print("Distance from perturbations: ", compute_distances(x, x_adv, ord=self._get_norm(attack_method)))
         return x_adv
 
-    def save_adversaries(self, data, attack, eps=None, seed=0):
+    def save_adversaries(self, data, attack_method, attack_library, debug):
         """
         Save adversarially augmented test set.
-        :param data: test set
-        :param dataset_name:
-        :param attack:
-        :param eps:
-        :return:
         """
-        filename = self.dataset_name + "_x_test_" + attack + "_"+str(self.library)+ "_seed=" + str(seed) + ".pkl"
-        eps_filename = self.dataset_name + "_x_test_" + attack + "_eps=" + str(eps) + "_"+str(self.library)+ "_seed=" \
-                       + str(seed) + ".pkl"
+        filename, filepath = directories._get_attack_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
+                                                 epochs=self.epochs, debug=debug, 
+                                                 attack_method=attack_method, attack_library=attack_library)
+        save_to_pickle(data=data, filepath=filepath+"/", filename=filename)
 
-        if eps:
-            save_to_pickle(data=data, relative_path=RESULTS, filename=eps_filename)
-        else:
-            save_to_pickle(data=data, relative_path=RESULTS, filename=filename)
+    def load_adversaries(self, attack_method, attack_library, debug):
 
-    def load_adversaries(self, relative_path, attack, seed=0, eps=None):
-        path = relative_path + self.dataset_name + "_x_test_" + attack + "_"+ str(self.library) + "_seed=" + str(seed) + ".pkl"
-        if eps:
-            eps_path = relative_path + self.dataset_name + "_x_test_" + attack + "_eps=" + str(eps) +\
-                       "_"+str(self.library)+ "_seed=" + str(seed) + ".pkl"
-            return load_from_pickle(path=eps_path, test=self.test)
-        else:
-            return load_from_pickle(path=path, test=self.test)
+        filename, filepath = directories._get_attack_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
+                                                 epochs=self.epochs, debug=debug, 
+                                                 attack_method=attack_method, attack_library=attack_library)
+        return load_from_pickle(fullpath=filepath+"/"+filename)
 
     def save_classifier(self, filepath, filename):
         """
         Saves the trained model and adds the current datetime to the filepath.
-        :relative_path: path of folder containing the trained model
         """
-        # if folder is None:
-        #     folder = self.folder
-        # if filename is None:
-        #     filename = self.filename
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        filepath = filepath + filename + ".h5"
-        print("\nSaving classifier: ", filepath)
-        self.model.save(filepath)
+        filepath+="/"
+        os.makedirs(filepath, exist_ok=True)
+        fullpath = filepath + filename + ".h5"
+        print("\nSaving classifier: ", fullpath)
+        self.model.save(fullpath)
 
     def load_classifier(self, filepath, filename):
         """
         Loads a pre-trained classifier.
-        :relative_path: path of folder containing the trained model
-        returns: trained classifier
         """
-        # if folder is None:
-        #     folder = self.folder
-        # if filename is None:
-        #     filename = self.filename
+        filepath+="/"
         print("\nLoading model: ", filepath + filename + ".h5")
         self.model = load_model(filepath + filename + ".h5")
         self.trained = True

@@ -1,12 +1,17 @@
+import random
 from utils.data import *
 from utils.directories import *
+from tensorflow.python.client import device_lib
 
 DATASETS = "mnist, cifar"
 ATTACKS = "fgsm, pgd, deepfool, carlini, newtonfool, virtual"
 PROJ_MODE = "flat, channels, one_channel, grayscale"
-# attacks_list = ["fgsm","pgd","deepfool","virtual","spatial","saliency"]
 
-# todo: set tf seed 
+random.seed(0)
+
+def get_available_gpus():
+    local_device_protos = device_lib.list_local_devices()
+    return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 def set_session(device, n_jobs):
     """
