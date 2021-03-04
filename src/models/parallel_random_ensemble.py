@@ -257,34 +257,3 @@ def _parallel_load_classifier(input_shape, num_classes, data_format, dataset_nam
     classifier.load_classifier(debug=debug, filename=filename, filepath=filepath)
     return classifier
 
-
-# def main(dataset_name, test, n_proj, size_proj, proj_mode, device):
-
-#     seed=0
-#     attacks = attacks = ["fgsm","pgd","deepfool","virtual","spatial","saliency"]
-#     x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name, test)
-
-#     baseline = BaselineConvnet(input_shape=input_shape, num_classes=num_classes, data_format=data_format,
-#                                dataset_name=dataset_name, test=test, epochs=None, library="cleverhans")
-#     baseline.load_classifier(relative_path=TRAINED_MODELS, filename=baseline.filename+"_seed="+str(seed))
-
-#     # === parallel train, save and load the whole ensemble === #
-#     model = ParallelRandomEnsemble(input_shape=input_shape, num_classes=num_classes, size_proj=size_proj,
-#                                    proj_idx=None, n_proj=n_proj, data_format=data_format, dataset_name=dataset_name,
-#                                    projection_mode=proj_mode, test=test, centroid_translation=False,
-#                                    library="cleverhans")
-#     # model.train(x_train, y_train, device=device)
-#     model_path = TRAINED_MODELS
-#     model.load_classifier(relative_path=model_path)
-#     add_baseline_prob=False
-#     print("\n== test set ==")
-#     model.evaluate(x=x_test, y=y_test, device=device, model_path=model_path, add_baseline_prob=add_baseline_prob)
-#     for attack in attacks:
-#         print("\n== "+str(attack)+" attack ==")
-#         for seed in [0, 1, 2]:
-#             print("\nseed =", seed)
-#             x_test_adv = model.load_adversaries(attack=attack, relative_path=DATA_PATH, seed=seed)
-#             model.evaluate(x_test_adv, y_test, device=device, model_path=model_path,
-#                            add_baseline_prob=add_baseline_prob)
-
-

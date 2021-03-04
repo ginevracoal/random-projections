@@ -117,7 +117,7 @@ class BaselineConvnet(AdversarialClassifier):
             filename, filepath = directories._get_model_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
                                                                 epochs=self.epochs, debug=debug)
 
-        super(BaselineConvnet, self).load_classifier(filepath=filepath, filename=filename)
+        return super(BaselineConvnet, self).load_classifier(filepath=filepath, filename=filename)
 
     def save_robust_classifier(self, robust_classifier, debug, attack_method, attack_library, filename=None, filepath=None):
 

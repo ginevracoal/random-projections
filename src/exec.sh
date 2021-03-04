@@ -12,8 +12,8 @@ N_JOBS=10
 
 ATTACK_LIBRARY="cleverhans"
 DEVICE="cpu"
-LOAD=False
-DEBUG=True
+LOAD="False"
+DEBUG="False"
 
 #######
 # run #

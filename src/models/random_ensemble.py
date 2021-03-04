@@ -256,26 +256,6 @@ class RandomEnsemble(BaselineConvnet):
         x_adv = load_from_pickle(fullpath=filepath+filename)
         return x_adv
 
-    # def _set_model_path(self, model_name="randens")s:
-    #     folder = MODEL_NAME + "/" + self.dataset_name + "_" + str(model_name) + "_size=" + str(self.size_proj) +\
-    #              "_" + str(self.projection_mode)
-    #     if self.centroid_translation:
-    #         folder = folder + "_centroid"
-    #     return {'folder': folder + "/", 'filename': None}
-
-    # def _set_baseline_filename(self, seed):
-    #     """ Sets baseline filenames inside randens folder based on the projection seed. """
-    #     filename = self.dataset_name + "_baseline" + "_size=" + str(self.size_proj) + \
-    #                "_" + str(self.projection_mode)
-    #     if self.centroid_translation:
-    #         filename = filename + "_centroid"
-
-    #     if self.epochs == None:
-    #         filename = filename + "_" + str(seed)
-    #     else:
-    #         filename = filename + "_epochs=" + str(self.epochs) + "_" + str(seed)
-    #     return filename
-
     def save_classifier(self, debug, filename=None, filepath=None):
         """
         Saves projections classifiers.
