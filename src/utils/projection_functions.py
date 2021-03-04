@@ -37,7 +37,7 @@ def compute_projections(input_data, random_seeds, n_proj, size_proj, projection_
     return projections, inverse_projections
 
 
-def compute_single_projection(input_data, seed, size_proj, projection_mode, translation=None):
+def compute_single_projection(input_data, proj_idx, size_proj, projection_mode, translation=None):
     """
     Computes a single projection of the whole input data and the associated inverse projection using Moore-Penrose
      pseudoinverse.
@@ -56,26 +56,26 @@ def compute_single_projection(input_data, seed, size_proj, projection_mode, tran
     """
 
     if projection_mode == "flat":
-        projection, inverse_projection = flat_projection(input_data=input_data, size_proj=size_proj, random_seed=seed,
-                                                         translation=translation)
+        projection, inverse_projection = flat_projection(input_data=input_data, size_proj=size_proj,
+                                                         proj_idx=proj_idx, translation=translation)
     elif projection_mode == "channels":
         projection, inverse_projection = channels_projection(input_data=input_data, size_proj=size_proj,
-                                                             random_seed=seed, translation=translation)
+                                                             proj_idx=proj_idx, translation=translation)
     elif projection_mode == "grayscale":
         projection, inverse_projection = grayscale_projection(input_data=input_data, size_proj=size_proj,
-                                                              random_seed=seed, translation=translation)
+                                                              proj_idx=proj_idx, translation=translation)
     else:
         raise AssertionError("Set a projection mode: flat, channels, grayscale.")
 
     return projection, inverse_projection
 
-def tf_flat_projection(input_data, random_seed, size_proj, translation=None):
+def tf_flat_projection(input_data, proj_idx, size_proj, translation=None):
     """ Computes a projection of the whole input data flattened over channels and also computes the inverse projection.
-    It samples `size_proj` random directions for the projection using the given `random_seed`, then translates the
+    It samples `size_proj` random directions for the projection using the given `proj_idx`, then translates the
     affine subspace using the input data centroid.
 
     :param input_data: high dimensional input data, type=tf.tensor, shape=(batch_size, rows, cols, channels)
-    :param random_seed: projection seed, type=int
+    :param proj_idx: projection seed, type=int
     :param size_proj: size of a projection, type=int
     :return:
     :param projection: random projection of input_data, type=tf.tensor,
@@ -94,7 +94,7 @@ def tf_flat_projection(input_data, random_seed, size_proj, translation=None):
         translation = np.zeros(shape=[1, rows, cols, channels], dtype=np.float32)
 
     # projection matrices
-    projector = GaussianRandomProjection(n_components=n_components, random_state=random_seed)
+    projector = GaussianRandomProjection(n_components=n_components, random_state=proj_idx)
     proj_matrix = np.float32(projector._make_random_matrix(n_components, n_features))
     pinv = np.linalg.pinv(proj_matrix)
 
@@ -119,12 +119,12 @@ def tf_flat_projection(input_data, random_seed, size_proj, translation=None):
     return projection, inverse_projection
 
 
-def flat_projection(input_data, random_seed, size_proj, translation):
+def flat_projection(input_data, proj_idx, size_proj, translation):
     """ Computes a projection of the whole input data flattened over channels and also computes the inverse projection.
-    It samples `size_proj` random directions for the projection using the given random_seed.
+    It samples `size_proj` random directions for the projection using the given proj_idx.
 
     :param input_data: high dimensional input data, type=np.ndarray, shape=(n_samples,rows,cols,channels)
-    :param random_seed: projection seed, type=int
+    :param proj_idx: projection seed, type=int
     :param size_proj: size of a projection, type=int
     :return:
     :param projection: random projection of input_data, type=np.ndarray, shape=(n_samples,size_proj,size_proj,channels)
@@ -134,18 +134,18 @@ def flat_projection(input_data, random_seed, size_proj, translation):
     sess = tf.Session()
     sess.as_default()
 
-    projection, inverse_projection = tf_flat_projection(input_data, random_seed, size_proj, translation)
+    projection, inverse_projection = tf_flat_projection(input_data, proj_idx, size_proj, translation)
     projection = projection.eval(session=sess)
     inverse_projection = inverse_projection.eval(session=sess)
     return projection, inverse_projection
 
 
-def channels_projection(input_data, random_seed, size_proj, translation):
+def channels_projection(input_data, proj_idx, size_proj, translation):
     """ Computes a projection of the whole input data over each channel, then reconstructs the rgb image.
     It also computes the inverse projections.
 
     :param input_data: high dimensional input data, type=np.ndarray, shape=(n_samples,rows,cols,channels)
-    :param random_seed: projection seed, type=int
+    :param proj_idx: projection seed, type=int
     :param size_proj: size of a projection, type=int
     :return:
     :param projection: random projection of input_data, type=np.ndarray, shape=(n_samples,size_proj,size_proj,channels)
@@ -158,7 +158,7 @@ def channels_projection(input_data, random_seed, size_proj, translation):
     inverse_projection = np.empty(input_data.shape)
     for channel in range(channels):
         single_channel = input_data[:, :, :, channel].reshape(samples, rows, cols, 1)
-        channel_projection, channel_inverse_projection = flat_projection(single_channel, random_seed, size_proj,
+        channel_projection, channel_inverse_projection = flat_projection(single_channel, proj_idx, size_proj,
                                                                          translation)
         projection[:, :, :, channel] = np.squeeze(channel_projection)
         inverse_projection[:, :, :, channel] = np.squeeze(channel_inverse_projection)
@@ -166,10 +166,10 @@ def channels_projection(input_data, random_seed, size_proj, translation):
     return projection, inverse_projection
 
 
-def grayscale_projection(input_data, random_seed, size_proj, translation):
+def grayscale_projection(input_data, proj_idx, size_proj, translation):
     """ Transforms input_data into rgb representation and calls flat_projection on it.
     :param input_data: high dimensional input data, type=np.ndarray, shape=(n_samples,rows,cols,channels)
-    :param random_seed: projection seed, type=int
+    :param proj_idx: projection seed, type=int
     :param size_proj: size of a projection, type=int
     :return:
     :param projection: random projection of input_data, type=np.ndarray, shape=(n_samples,size_proj,size_proj,channels)
@@ -179,7 +179,7 @@ def grayscale_projection(input_data, random_seed, size_proj, translation):
     samples, rows, cols, channels = input_data.shape
     grayscale_data = np.array([rgb2gray(rgb_im) for rgb_im in input_data]).reshape((samples, rows, cols, 1))
     # plot_projections([input_data,grayscale_data])
-    return flat_projection(grayscale_data, random_seed, size_proj, translation)
+    return flat_projection(grayscale_data, proj_idx, size_proj, translation)
 
 
 def compute_perturbations(input_data, inverse_projections):

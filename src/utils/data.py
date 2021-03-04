@@ -3,7 +3,6 @@ import time
 import math
 import numpy as np
 import pickle as pkl
-import seaborn as sns
 import tensorflow as tf
 from pandas import DataFrame
 import matplotlib.pyplot as plt

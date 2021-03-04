@@ -193,7 +193,7 @@ class AdversarialClassifier(sklKerasClassifier):
                         attacker = art.attacks.VirtualAdversarialMethod(classifier)
                         x_adv = attacker.generate(x)
                     elif attack_method == 'carlini':
-                        attacker = art.attacks.CarliniLInfMethod(classifier, targeted=False, eps=0.5)
+                        attacker = art.attacks.CarliniLInfMethod(classifier, targeted=False, eps=0.3)
                         x_adv = attacker.generate(x=x)
                     elif attack_method == 'pgd':
                         attacker = art.attacks.ProjectedGradientDescent(classifier, eps=eps)
@@ -226,8 +226,8 @@ class AdversarialClassifier(sklKerasClassifier):
                     if attack_method == 'fgsm':
                         attacker = cleverhans.attacks.FastGradientMethod(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
-                    elif attack == 'deepfool':
-                        attack_method = cleverhans.attacks.DeepFool(classifier, sess=session)
+                    elif attack_method == 'deepfool':
+                        attacker = cleverhans.attacks.DeepFool(classifier, sess=session)
                         x_adv = batch_generate(attacker, x)
                     elif attack_method == 'carlini':
                         attacker = cleverhans.attacks.CarliniWagnerL2(classifier, sess=session)
