@@ -135,7 +135,7 @@ class BaselineConvnet(AdversarialClassifier):
                                                                 epochs=self.epochs, debug=debug, robust=True, 
                                                                 attack_method=attack_method, attack_library=attack_library)
 
-        robust_classifier = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes, 
+        robust_classifier = BaselineConvnet(input_shape=self.input_shape, num_classes=self.num_classes, epochs=self.epochs, 
                                             data_format=self.data_format, dataset_name=self.dataset_name)
 
         robust_classifier.load_classifier(filepath=filepath, filename=filename, debug=debug)

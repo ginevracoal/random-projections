@@ -11,7 +11,7 @@ parser.add_argument("--epochs", default=20, type=int, help="Training epochs.")
 parser.add_argument("--load", default=False, type=eval, help="Load saved computations and evaluate them.")
 parser.add_argument("--debug", default=False, type=eval, help="Run script in debugging mode.")
 parser.add_argument("--device", default='cpu', type=str, help="cpu")
-parser.add_argument("--attack_library", default='cleverhans', type=str, help="art, cleverhans")  
+parser.add_argument("--attack_library", default='art', type=str, help="art, cleverhans")  
 args = parser.parse_args()
 
 n_proj_list = [6, 9, 12, 15]

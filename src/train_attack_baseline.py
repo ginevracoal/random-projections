@@ -9,7 +9,7 @@ parser.add_argument("--epochs", default=20, type=int, help="Training epochs.")
 parser.add_argument("--load", default=False, type=eval, help="Load saved computations and evaluate them.")
 parser.add_argument("--debug", default=False, type=eval, help="Run script in debugging mode.")
 parser.add_argument("--device", default='cpu', type=str, help="cpu")  # todo: gpu
-parser.add_argument("--attack_library", default='cleverhans', type=str, help="art, cleverhans")  
+parser.add_argument("--attack_library", default='art', type=str, help="art, cleverhans")  
 args = parser.parse_args()
 
 if args.attack_method:
@@ -20,9 +20,9 @@ else:
 n_jobs=10 if args.device=="cpu" else 1
 set_session(device=args.device, n_jobs=n_jobs)
 
-def train_eval(dataset_name, epochs, attacks_list, attack_library, debug, device, load=False):
+def train(dataset_name, epochs, debug, device):
     """
-    Train and attack the baseline with the chosen attack methods. 
+    Train the baseline.
     """
 
     x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name=dataset_name,
@@ -31,20 +31,29 @@ def train_eval(dataset_name, epochs, attacks_list, attack_library, debug, device
     baseline = BaselineConvnet(input_shape=input_shape, num_classes=num_classes, data_format=data_format,
                                dataset_name=dataset_name, epochs=epochs)
     
-    if load:
-        baseline.load_classifier(debug)
+    baseline.train(x_train, y_train, device=device)
+    baseline.save_classifier(debug)
 
-    else:
-        baseline.train(x_train, y_train, device=device)
-        baseline.save_classifier(debug)
 
+def eval(dataset_name, epochs, attacks_list, attack_library, debug, device, load=False):
+    """
+    Attack the baseline with the chosen attack methods. 
+    """
+
+    x_train, y_train, x_test, y_test, input_shape, num_classes, data_format = load_dataset(dataset_name=dataset_name,
+                                                                                           debug=debug)
+
+    baseline = BaselineConvnet(input_shape=input_shape, num_classes=num_classes, data_format=data_format,
+                               dataset_name=dataset_name, epochs=epochs)
+    
+    baseline.load_classifier(debug)
     baseline.evaluate(x=x_test, y=y_test)
 
     for attack_method in attacks_list:
 
         if load:
-            x_test_adv = model.load_adversaries(attack_method=attack_method, attack_library=attack_library, 
-                                                debug=debug)
+            x_test_adv = baseline.load_adversaries(attack_method=attack_method, attack_library=attack_library, 
+                                                    debug=debug)
         else:
             x_test_adv = baseline.generate_adversaries(x=x_test, y=y_test, device=device,
                                   attack_method=attack_method, attack_library=attack_library)
@@ -98,7 +107,9 @@ def adversarial_train_eval(dataset_name, epochs, attacks_list, attack_library, d
             print(f"\n{attack_method} attack against {tmp_attack_method} robust baseline")
             robust_baselines[idx].evaluate(x=x_test_adv, y=y_test)
 
-train_eval(dataset_name=args.dataset_name, epochs=args.epochs, attacks_list=attacks_list, attack_library=args.attack_library, 
+# train(dataset_name=args.dataset_name, epochs=args.epochs, debug=args.debug, device=args.device)
+
+eval(dataset_name=args.dataset_name, epochs=args.epochs, attacks_list=attacks_list, attack_library=args.attack_library, 
            debug=args.debug, device=args.device, load=args.load)
 
 adversarial_train_eval(dataset_name=args.dataset_name, epochs=args.epochs, attacks_list=attacks_list, attack_library=args.attack_library, 

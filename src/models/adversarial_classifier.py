@@ -187,7 +187,7 @@ class AdversarialClassifier(sklKerasClassifier):
                         attacker = art.attacks.FastGradientMethod(classifier, eps=0.3)
                         x_adv = attacker.generate(x=x)
                     elif attack_method == 'deepfool':
-                        attacker = art.attacks.DeepFool(classifier, nb_grads=5)
+                        attacker = art.attacks.DeepFool(classifier)
                         x_adv = attacker.generate(x)
                     elif attack_method == 'virtual':
                         attacker = art.attacks.VirtualAdversarialMethod(classifier)
@@ -207,8 +207,7 @@ class AdversarialClassifier(sklKerasClassifier):
                         x_adv = attacker.generate(x=x)
                     elif attack_method == 'spatial':
                         attacker = art.attacks.SpatialTransformation(classifier, max_translation=3.0, num_translations=5,
-                                                         max_rotation=8.0,
-                                                         num_rotations=3)
+                                                                     max_rotation=8.0, num_rotations=3)
                         x_adv = attacker.generate(x=x)
                     elif attack_method == 'zoo':
                         attacker = art.attacks.ZooAttack(classifier)
@@ -266,7 +265,7 @@ class AdversarialClassifier(sklKerasClassifier):
         filename, filepath = directories._get_attack_savedir(model_name=self.model_name, dataset_name=self.dataset_name, 
                                                  epochs=self.epochs, debug=debug, 
                                                  attack_method=attack_method, attack_library=attack_library)
-        return load_from_pickle(fullpath=filepath+filename)
+        return load_from_pickle(fullpath=filepath+filename, debug=debug)
 
     def save_classifier(self, filepath, filename):
         """

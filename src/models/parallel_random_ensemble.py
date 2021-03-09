@@ -169,7 +169,7 @@ class ParallelRandomEnsemble(RandomEnsemble):
         proj_predictions = Parallel(n_jobs=self.n_jobs)(
             delayed(_parallel_evaluate)(input_shape=self.input_shape, num_classes=self.num_classes, debug=debug,
                                         data_format=self.data_format, dataset_name=self.dataset_name,
-                                        filepath=filepath, input_data=x, proj_idx=i, 
+                                        filepath=filepath, input_data=x, proj_idx=i, epochs=self.epochs,
                                         filename=filename+"_"+str(i), size_proj=self.size_proj,
                                         projection_mode=self.projection_mode, translation=translation)
             for i in list(self.random_seeds))
@@ -202,7 +202,7 @@ class ParallelRandomEnsemble(RandomEnsemble):
         print("Accuracy: %.2f%%" % (acc * 100))
         return acc
 
-def _parallel_evaluate(input_shape, num_classes, debug, data_format, dataset_name, filepath, filename,
+def _parallel_evaluate(input_shape, num_classes, debug, data_format, epochs, dataset_name, filepath, filename,
                        size_proj, input_data, proj_idx, projection_mode, translation):
     """ Parallel evaluation on single projections using BaselineConvnet base class. """
     classifier = BaselineConvnet(input_shape=input_shape, num_classes=num_classes, data_format=data_format,
